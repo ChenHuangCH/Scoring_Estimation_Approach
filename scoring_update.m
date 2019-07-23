@@ -14,7 +14,7 @@
 % spatial correlation. BSSA, 2019.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function Output=scoring(y,x,w,id,f1,f2,gamma0,theta0,tol,cl,cf)
+function Output=scoring_update(y,x,w,id,f1,f2,gamma0,theta0,tol,cl,cf,strike)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This function computes the estimates of user-defined GM model
 % with stationary and isotropic correlation functions by the method of Scoring
@@ -51,6 +51,8 @@ function Output=scoring(y,x,w,id,f1,f2,gamma0,theta0,tol,cl,cf)
 % type (No), 'exponential' type (Exp), Matern type with v=1.5 (Matern1.5)
 % and 'squared exponential' type (SExp).
 %
+% strike: the strike angle of finite-fault model in degree measured from North
+% 
 % OUTPUTS:
 % An output structure which contains:
 %
@@ -77,21 +79,24 @@ theta_trans=log(theta0);
 %Compute the initial design matrix of \beta
 B=f1(x,gamma);
 %Compute the initial covariance matrix and its determinant
-c=sepdis(w,id); %compute the matrix of separation distances for each event
+[c,c_par,c_nor]=sepdis(w,id,strike); %compute the matrix of separation distances for each event
 
 switch cf
     case 'No'
-Omega=CovNo(theta_trans,c);
-D=deterNo(theta_trans,c);
+        Omega=CovNo(theta_trans,c);
+        D=deterNo(theta_trans,c);
     case 'Exp'
-Omega=CovExp(theta_trans,c);
-D=deterExp(theta_trans,c);
+        Omega=CovExp(theta_trans,c);
+        D=deterExp(theta_trans,c);
     case 'SExp'
-Omega=CovSExp(theta_trans,c);
-D=deterSExp(theta_trans,c);
+        Omega=CovSExp(theta_trans,c);
+        D=deterSExp(theta_trans,c);
     case 'Matern1.5'
-Omega=CovMatern15(theta_trans,c);
-D=deterMatern15(theta_trans,c);
+        Omega=CovMatern15(theta_trans,c);
+        D=deterMatern15(theta_trans,c);
+    case 'ExpAni'
+        Omega=CovExpAni(theta_trans,c_par,c_nor);
+        D=deterExpAni(theta_trans,c_par,c_nor);
 end
 
 %Compute the initial value for \beta
@@ -113,13 +118,15 @@ A1=f2(x,gamma); %B_\gamma
 
 switch cf
     case 'No'
-A2=CtNo(theta_trans,c);
+        A2=CtNo(theta_trans,c);
     case 'Exp'
-A2=CtExp(theta_trans,c); %C_\theta
+        A2=CtExp(theta_trans,c); %C_\theta
     case 'SExp'
-A2=CtSExp(theta_trans,c);
+        A2=CtSExp(theta_trans,c);
     case 'Matern1.5'
-A2=CtMatern15(theta_trans,c);
+        A2=CtMatern15(theta_trans,c);
+    case 'ExpAni'
+        A2=CtExpAni(theta_trans,c_par,c_nor);
 end
 
 A3=(y-B*beta);
@@ -208,7 +215,7 @@ Output(1).InformationCriteria=info;
 
 end
 
-function c=sepdis(position,id)
+function [c,c_par,c_nor]=sepdis(position,id,strike)
 %This function computes the speration distances between stations for each
 %earthquake.
 %Inputs: id is the index labelling the event; position is the coordinates of
@@ -217,21 +224,41 @@ function c=sepdis(position,id)
 %event.
 [g,event]=findgroups(id);
 c=cell(1,length(event));
+c_par=cell(1,length(event));
+c_nor=cell(1,length(event));
 for j=1:length(event)
     subpos=position(g==j,:);
-m=size(subpos,1);
-[K,L]=ndgrid(1:m);
-K=K(:);
-L=L(:);
-pairs=[L,K];
-X1=zeros(size(pairs,1),4);
-% for i=1:size(pairs,1)
-% X1(i,:)=[subpos(pairs(i,1),:), subpos(pairs(i,2),:)];
-% end
-X1=[subpos(pairs(:,1),:), subpos(pairs(:,2),:)];
-pairdis=deg2km(distance(X1(:,1),X1(:,2),X1(:,3),X1(:,4)));
+    m=size(subpos,1);
+    [K,L]=ndgrid(1:m);
+    K=K(:);
+    L=L(:);
+    pairs=[L,K];
+    
+    set1=subpos(pairs(:,1),:);
+    set2=subpos(pairs(:,2),:);
+    vector_originalcoord=set2-set1;
+    
+    set1_rotate=zeros(size(set1));
+    set2_rotate=zeros(size(set2));
+    
+    theta=(90-strike)/180*pi;
+    set1_rotate(:,1)=cos(theta).*set1(:,1)-sin(theta).*set1(:,2);
+    set1_rotate(:,2)=sin(theta).*set1(:,1)+cos(theta).*set1(:,2);
+    set2_rotate(:,1)=cos(theta).*set2(:,1)-sin(theta).*set2(:,2);
+    set2_rotate(:,2)=sin(theta).*set2(:,1)+cos(theta).*set2(:,2);
+    vector_Rotatecoord=set2_rotate-set1_rotate;
+
+pairdis=sqrt(vector_originalcoord(:,1).^2+vector_originalcoord(:,2).^2);
+pairdis_par=abs(vector_Rotatecoord(:,1));
+pairdis_nor=abs(vector_Rotatecoord(:,2));
+
 subdis=vec2mat(pairdis, m);
+subdis_par=vec2mat(pairdis_par, m);
+subdis_nor=vec2mat(pairdis_nor, m);
+
 c{1,j}=subdis;
+c_par{1,j}=subdis_par;
+c_nor{1,j}=subdis_nor;
 end
 end
 
@@ -280,6 +307,17 @@ end
 Omega=blkdiag(Omega_i{:});
 end
 
+function Omega=CovExpAni(theta_trans,c_lat,c_lon)
+%This function computes the covariance matrix \Omega with anisotropic exponential
+%correlation function.
+n=length(c_lat);
+Omega_i=cell(1,n);
+for i=1:n
+Omega_i{1,i}=exp(theta_trans(1))+exp(theta_trans(2)-((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^0.5).*exp(-theta_trans(3)));
+end
+Omega=blkdiag(Omega_i{:});
+end
+
 function d=deterNo(theta_trans,c)
 %This function computes the log-determinant of the covariance matrix with
 %no spatial correlation.
@@ -318,6 +356,17 @@ d=0;
 for i=1:n
 d=d+logdet(exp(theta_trans(1))+exp(theta_trans(2)-sqrt(3).*c{i}.*exp(-theta_trans(3)))...
     .*(1.+sqrt(3).*c{i}.*exp(-theta_trans(3))),'chol');
+end
+end
+
+function d=deterExpAni(theta_trans,c_lat,c_lon)
+%This function computes the log-determinant of the covariance matrix with
+%anisotropic exponential correlation function.
+n=length(c_lat);
+d=0;
+for i=1:n
+d=d+logdet(exp(theta_trans(1))+exp(theta_trans(2)-((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^0.5).*exp(-theta_trans(3))));
+
 end
 end
 
@@ -432,6 +481,46 @@ C3=blkdiag(C3_i{:});
 A{1}=C1;
 A{2}=C2;
 A{3}=C3;
+end
+
+function A=CtExpAni(theta_trans,c_lat,c_lon)
+n=length(c_lat);
+A=cell(1,4);
+%compute the derivative wrt \tau^2
+C1_i=cell(1,n);
+for i=1:n
+C1_i{1,i}=exp(theta_trans(1)).*ones(size(c_lat{i},1));
+end
+C1=blkdiag(C1_i{:});
+
+%compute the derivative wrt \sigma^2
+C2_i=cell(1,n);
+for i=1:n
+C2_i{1,i}=exp(theta_trans(2)-((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^0.5).*exp(-theta_trans(3)));
+end
+C2=blkdiag(C2_i{:});
+
+%compute the derivative wrt h
+C3_i=cell(1,n);
+for i=1:n
+C3_i{1,i}=((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^0.5).*exp(theta_trans(2)-((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^0.5).*exp(-theta_trans(3))...
+    -theta_trans(3));
+end
+C3=blkdiag(C3_i{:});
+
+%compute the derivative wrt \theta4
+C4_i=cell(1,n);
+for i=1:n
+C4_i{1,i}=-0.5.*c_lon{i}.^2.*((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^(-0.5))...
+    .*exp(theta_trans(2)-((c_lat{i}.^2+exp(theta_trans(4)).*c_lon{i}.^2).^0.5).*exp(-theta_trans(3))-theta_trans(3)+theta_trans(4));
+C4_i{1,i}(isnan(C4_i{1,i}))=0;
+end
+C4=blkdiag(C4_i{:});
+
+A{1}=C1;
+A{2}=C2;
+A{3}=C3;
+A{4}=C4;
 end
 
 function s=Sgamma(Omega,A1,A3,beta)
