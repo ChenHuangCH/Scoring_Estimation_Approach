@@ -1,17 +1,28 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%This program is free software: you can redistribute it and/or modify
-%it under the terms of the GNU General Public License as published by
-%the Free Software Foundation, either version 3 of the License, or
-%(at your option) any later version.
-%
-%Copyright (C): Deyu MING
-%Date: 3 May 2019
-%Affiliation: Dept of Statistical Science at University College London
-%Email: deyu.ming.16@ucl.ac.uk
-%
-% Reference: Ming, D., Huang, C., Peters, G.W., and Galasso, C. 
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% Copyright (C): Chen HUANG
+% Date: 19 August 2019
+% Affiliation: Dept of Civil, Environmental and Geomatic Engeering at 
+% University College London
+% Email: chen.huang.14@ucl.ac.uk
+% 
+% Contributor: Deyu MING
+% Affiliation: Dept of Statistical Science at University College London
+% Email: deyu.ming.16@ucl.ac.uk
+% 
+% Reference: 
+% Huang, C., and Galasso, C. (2019). Ground-motion intensity measure 
+% correlations observed in Italian data, Earthquake Engineering and 
+% Structural Dynamics (Accepted/in press)
+% 
+% Ming, D., Huang, C., Peters, G.W., and Galasso, C. (2019)
 % An advanced estimation algorithm for ground-motion models with 
-% spatial correlation. BSSA, 2019.
+% spatial correlation. Bulletin of the Seismological Society of America, 
+% 109(2): 541-566.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function Output=scoring_update(y,x,w,id,f1,f2,gamma0,theta0,tol,cl,cf,strike)
@@ -49,9 +60,11 @@ function Output=scoring_update(y,x,w,id,f1,f2,gamma0,theta0,tol,cl,cf,strike)
 %
 % cf: the type of the covariance function: currently support 'No spatial'
 % type (No), 'exponential' type (Exp), Matern type with v=1.5 (Matern1.5)
-% and 'squared exponential' type (SExp).
+% and 'squared exponential' type (SExp);
 %
-% strike: the strike angle of finite-fault model in degree measured from North
+% strike: the strike angle of finite-fault model in degree measured from
+% North for the calculation of distance along the fault-parallel and
+% fault-normal direction.
 % 
 % OUTPUTS:
 % An output structure which contains:
