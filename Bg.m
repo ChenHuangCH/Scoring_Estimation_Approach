@@ -3,7 +3,8 @@ function A=Bg(x,gamma)
 % gamma, B_{\gamma}
 A=cell(1,length(gamma));
 
-n=9; %Replace here by the number of linear coefficients in your GMPE!
+%Replace here by the number of linear coefficients in your GMPE!
+n=9; 
 
 % The following block creates the grident of design matrix B wrt the nonlinear 
 % coefficient b_6 in the ground-motion prediction fct of Akkar&Bommer
