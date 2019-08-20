@@ -158,7 +158,7 @@ delta=1;
 while ll<ll_old
 %Update gamma
 gamma=gamma_old+delta*((Igg-Igb/Ibb*Igb')\Sg);
-B=design(x,gamma);
+B=f1(x,gamma);
 %Update theta
 theta_trans=theta_trans_old+delta.*modify(St,Itt);
 
